@@ -15,17 +15,27 @@ if not REDIS_URL:
 
 parsed = urlparse(REDIS_URL)
 
-if not all([parsed.hostname, parsed.port, parsed.password]):
-    raise RuntimeError("REDIS_URL is missing components. Check format: rediss://default:<token>@host:6379")
+if not all([parsed.hostname, parsed.port]):
+    raise RuntimeError("REDIS_URL is missing components. Check format: redis://host:6379/0")
 
-redis_client = redis.Redis(
-    host=parsed.hostname,
-    port=int(parsed.port),
-    username=parsed.username,
-    password=parsed.password,
-    ssl=True,
-    decode_responses=True
-)
+# Configure Redis client based on URL scheme (redis vs rediss)
+redis_config = {
+    'host': parsed.hostname,
+    'port': int(parsed.port),
+    'decode_responses': True
+}
+
+# Add authentication if provided
+if parsed.username:
+    redis_config['username'] = parsed.username
+if parsed.password:
+    redis_config['password'] = parsed.password
+
+# Add SSL if using rediss://
+if parsed.scheme == 'rediss':
+    redis_config['ssl'] = True
+
+redis_client = redis.Redis(**redis_config)
 
 # --- Base Utility Functions ---
 

@@ -3,7 +3,9 @@ uvicorn
 langchain
 langchain_core
 langchain_groq
+langchain_google_genai
 langchain_community
+google-generativeai
 pandas
 pydantic
 python-dotenv
@@ -21,3 +23,5 @@ tldextract
 playwright
 celery[redis]
 redis
+flower
+watchdog

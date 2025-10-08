@@ -3,7 +3,7 @@ import os, re, json, argparse
 from typing import List, Tuple, Dict, Any
 import random
 from dotenv import load_dotenv
-from llm_provider import get_chat_groq
+from llm_provider import get_llm_client
 import time
 
 
@@ -176,7 +176,7 @@ def score_line(line: str, used_kind: str) -> float:
 
 def _chat(temperature: float):
     # ✅ Same model & API via shared provider
-    return get_chat_groq(temperature=temperature)
+    return get_llm_client(temperature=temperature)
 
 def normalize_evidence(evidence: Any) -> List[Tuple[str, str]]:
     norm: List[Tuple[str, str]] = []
@@ -263,8 +263,9 @@ def generate_punchlines(
             line += "."
         if passes_qc(line, snippets) and all(line.lower() != r.lower() for r in raw):
             raw.append(line)
+            # Wait 2 seconds after generating each punchline
+            time.sleep(2)
         i += 1
-        time.sleep(10)
 
     while len(raw) < k:
         raw.append("Couldn’t access website—manual review needed.")

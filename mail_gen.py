@@ -11,8 +11,8 @@ from langchain_core.output_parsers import StrOutputParser
 from database import SessionLocal, LeadDB
 from contextlib import contextmanager
 
-# NEW: shared LLM provider
-from llm_provider import get_chat_groq
+# NEW: shared LLM provider (now supports Gemini)
+from llm_provider import get_llm_client
 
 # Load env for non-LLM settings used here (idempotent even if llm_provider already loaded it)
 load_dotenv()
@@ -68,8 +68,8 @@ def generate_email_from_lead(lead_id: int) -> tuple[str, str]:
             template=template,
         )
 
-        # ✅ Same model & API via shared provider
-        llm = get_chat_groq()  # temperature/model come from llm_provider/.env
+        # ✅ Same model & API via shared provider (now Gemini 2.0 Flash Lite)
+        llm = get_llm_client()  # Uses configured LLM provider from .env
 
         chain = prompt | llm | StrOutputParser()
 

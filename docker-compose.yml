@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Redis for Celery
+  redis:
+    image: redis:7-alpine
+    container_name: nh_outreach_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - nh_outreach_network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # Main FastAPI Application with Watchdog
+  app:
+    build: .
+    container_name: nh_outreach_app
+    depends_on:
+      - redis
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - DOCKER_ENV=true
+      - GRPC_VERBOSITY=ERROR
+      - GRPC_TRACE=""
+    volumes:
+      - ./:/app  # Mount entire project for file watching
+      - ./static:/app/static
+      - ./uploaded_csvs:/app/uploaded_csvs
+      - ./auth:/app/auth
+    ports:
+      - "8000:8000"
+    networks:
+      - nh_outreach_network
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Starting application with Watchdog...'
+        python watchdog_monitor.py
+      "
+
+  # Celery Worker
+  celery-worker:
+    build: .
+    container_name: nh_outreach_celery_worker
+    depends_on:
+      - redis
+      - app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - GRPC_VERBOSITY=ERROR
+      - GRPC_TRACE=""
+    volumes:
+      - ./static:/app/static
+      - ./uploaded_csvs:/app/uploaded_csvs
+      - ./auth:/app/auth
+    networks:
+      - nh_outreach_network
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Starting Celery worker...'
+        celery -A celery_worker.celery_app worker --loglevel=info
+      "
+
+  # Celery Flower (Optional - for monitoring Celery tasks)
+  flower:
+    build: .
+    container_name: nh_outreach_flower
+    depends_on:
+      - redis
+      - celery-worker
+    env_file:
+      - .env
+    environment:
+      - GRPC_VERBOSITY=ERROR
+      - GRPC_TRACE=""
+    ports:
+      - "5555:5555"
+    networks:
+      - nh_outreach_network
+    restart: unless-stopped
+    command: >
+      sh -c "
+        echo 'Starting Flower...'
+        celery -A celery_worker.celery_app flower --port=5555
+      "
+
+volumes:
+  redis_data:
+
+networks:
+  nh_outreach_network:
+    driver: bridge

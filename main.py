@@ -118,7 +118,40 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 def root():
     return {"message": "NH Outreach Agent API is up and running"}
 
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Docker and load balancers"""
+    return {"status": "healthy", "timestamp": datetime.datetime.now().isoformat()}
 
+@app.get("/health/llm")
+def llm_health_check():
+    """Test LLM provider connectivity and configuration"""
+    try:
+        from llm_provider import get_llm_client, LLM_PROVIDER, GEMINI_MODEL, GOOGLE_API_KEY
+        
+        # Basic configuration check
+        if LLM_PROVIDER == "gemini" and not GOOGLE_API_KEY:
+            return {"status": "error", "message": "GOOGLE_API_KEY not configured"}
+        
+        # Try to get LLM client
+        llm = get_llm_client()
+        
+        # Simple test prompt
+        test_response = llm.invoke("Say 'Hello from Gemini!' in exactly those words.")
+        
+        return {
+            "status": "healthy", 
+            "provider": LLM_PROVIDER,
+            "model": GEMINI_MODEL if LLM_PROVIDER == "gemini" else "N/A",
+            "test_response": test_response.content if hasattr(test_response, 'content') else str(test_response),
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {
+            "status": "error", 
+            "message": str(e),
+            "timestamp": datetime.datetime.now().isoformat()
+        }
 
 @app.get("/leads", response_model=list[Lead])
 async def get_saved_leads(skip: int = 0, limit: int = 10):
