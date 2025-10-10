@@ -27,6 +27,7 @@ class Lead(BaseModel):
     pagespeed_metrics_mobile: Optional[Dict[str, Any]] = None
     pagespeed_metrics_desktop: Optional[Dict[str, Any]] = None
     sent_to_salesrobot: Optional[bool] = False
+    recommendations_screenshot_url: Optional[str] = None
 
     class Config:
         orm_mode = True

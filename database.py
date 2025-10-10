@@ -47,6 +47,7 @@ class LeadDB(Base):
     punchline1 = Column(String, nullable=True)
     punchline2 = Column(String, nullable=True)
     punchline3 = Column(String, nullable=True)
+    recommendations_screenshot_url = Column(String, nullable=True)
 
 
 # Base.metadata.drop_all(bind=engine)  # Drop existing tables

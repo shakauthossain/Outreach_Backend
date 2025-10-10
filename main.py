@@ -22,7 +22,7 @@ from auth.routes import router as auth_router
 from apollo import fetch_apollo_leads, get_person_details
 from models import Lead, MailBody
 from database import SessionLocal, LeadDB
-from pagespeed import test_all_unspeeded_leads, refresh_speed_for_lead
+from pagespeed import test_all_unspeeded_leads, refresh_speed_for_lead, capture_recommendations_screenshot
 from mail_gen import generate_email_from_lead, send_email_to_lead
 from pagespeed import get_pagespeed_score_and_screenshot
 from GoHighLevel import fetch_gohighlevel_leads
@@ -33,6 +33,7 @@ from punchline import generate_punchlines
 from background_tasks import process_punchlines_for_lead, process_punchlines_for_all_leads
 from celery.result import AsyncResult
 from background_speedtest import run_bulk_speedtest_task
+from background_recommendations import run_bulk_recommendations_capture
 
 app = FastAPI()
 
@@ -373,6 +374,53 @@ def refresh_one_speed(lead_id: int):
         return {"error": "Speed test failed or lead not found"}
     return {"message": f"Updated: W-{web}, M-{mob}"}
 
+@app.post("/capture-recommendations/{lead_id}")
+def capture_recommendations_for_lead(lead_id: int):
+    """Capture only the recommendations screenshot for a lead that already has speed data"""
+    db = SessionLocal()
+    try:
+        lead = db.query(LeadDB).filter(LeadDB.id == lead_id).first()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Lead not found")
+        
+        if not lead.website_speed_web and not lead.website_speed_mobile:
+            raise HTTPException(status_code=400, detail="Lead has no speed test data. Run speed test first.")
+        
+        # Capture recommendations screenshot
+        screenshot_url = capture_recommendations_screenshot(lead_id, lead.website_url)
+        
+        if screenshot_url:
+            lead.recommendations_screenshot_url = screenshot_url
+            db.commit()
+            return {
+                "success": True,
+                "lead_id": lead_id,
+                "recommendations_screenshot_url": screenshot_url
+            }
+        else:
+            return {
+                "success": False,
+                "lead_id": lead_id,
+                "error": "Failed to capture screenshot"
+            }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@app.post("/capture-recommendations-all")
+def capture_recommendations_for_all_leads():
+    """Capture recommendations screenshots for all leads that have speed data but no recommendations screenshot"""
+    try:
+        result = run_bulk_recommendations_capture()
+        return {
+            "message": "Bulk recommendations screenshot capture completed",
+            "result": result
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/test-pagespeed")
 def test_pagespeed_metrics(url: str):
     scores, screenshot, diagnostics, metrics = get_pagespeed_score_and_screenshot(url, "mobile")
@@ -386,7 +434,12 @@ def test_pagespeed_metrics(url: str):
 
 DEFAULT_EXPORT_COLUMNS = [
     "id", "first_name", "last_name", "email",
-    "company", "title", "website_url", "linkedin_url"
+    "company", "title", "website_url", "linkedin_url",
+    "website_speed_web", "website_speed_mobile",
+    "screenshot_url_web", "screenshot_url_mobile",
+    "recommendations_screenshot_url",
+    "accessibility_score", "seo_score", "best_practices_score",
+    "punchline1", "punchline2", "punchline3"
 ]
 
 def _resolve_export_columns(columns_param: Optional[str]) -> List[str]:
