@@ -8,7 +8,7 @@ The Docker Compose setup includes the following services:
 
 - **app**: Main FastAPI application (Port 8000)
 - **postgres**: PostgreSQL database (Port 5432)
-- **redis**: Redis server for Celery task queue (Port 6379)
+- **redis**: Redis server for Celery task queue (Port 6389)
 - **celery-worker**: Celery worker for background tasks
 - **flower**: Celery monitoring dashboard (Port 5555)
 
@@ -45,7 +45,7 @@ Edit the `.env` file to configure your application:
 ```env
 # Database (automatically configured for Docker)
 DATABASE_URL=postgresql://nh_outreach_user:nh_outreach_password@postgres:5432/nh_outreach_db
-REDIS_URL=redis://redis:6379/0
+REDIS_URL=redis://redis:6389/0
 
 # Add your API keys
 GROQ_API_KEY=your_groq_api_key

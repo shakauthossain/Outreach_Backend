@@ -16,7 +16,7 @@ if not REDIS_URL:
 parsed = urlparse(REDIS_URL)
 
 if not all([parsed.hostname, parsed.port]):
-    raise RuntimeError("REDIS_URL is missing components. Check format: redis://host:6379/0")
+    raise RuntimeError("REDIS_URL is missing components. Check format: redis://host:6389/0")
 
 # Configure Redis client based on URL scheme (redis vs rediss)
 redis_config = {
