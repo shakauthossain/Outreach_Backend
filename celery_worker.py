@@ -7,7 +7,7 @@ import ssl
 load_dotenv()
 
 # Fetch the Redis URL from environment variables
-REDIS_URL = os.getenv("REDIS_URL", "rediss://default:Ae_SAAIjcDE0ZWRmNzU2OWM4MDc0ZmM2OTg4MjU1NjBjOTliNDVhYXAxMA@expert-dinosaur-61394.upstash.io:6389/0?ssl_cert_reqs=CERT_NONE")
+REDIS_URL = os.getenv("REDIS_URL", "rediss://default:Ae_SAAIjcDE0ZWRmNzU2OWM4MDc0ZmM2OTg4MjU1NjBjOTliNDVhYXAxMA@expert-dinosaur-61394.upstash.io:6379/0?ssl_cert_reqs=CERT_NONE")
 
 # Initialize Celery with Redis as broker and backend
 celery_app = Celery(
