@@ -1,5 +1,5 @@
 from database import SessionLocal, LeadDB
-from pagespeed import bulk_capture_recommendations_with_session
+from pagespeed import capture_recommendations_screenshot
 from sqlalchemy import or_
 
 def run_bulk_recommendations_capture():
@@ -20,29 +20,35 @@ def run_bulk_recommendations_capture():
         if not leads:
             return {"success": 0, "failed": 0, "total": 0}
         
-        # Prepare data for bulk capture (lead_id, website_url)
-        leads_data = [(lead.id, lead.website_url) for lead in leads]
-        
-        # Use optimized bulk capture with single login session
-        print("🚀 Starting optimized bulk capture (single login session)...")
-        capture_results = bulk_capture_recommendations_with_session(leads_data)
-        
-        # Update database with successful captures
-        print("\n💾 Updating database with captured screenshots...")
-        for detail in capture_results["details"]:
-            if detail["status"] == "success":
-                lead = db.query(LeadDB).filter(LeadDB.id == detail["lead_id"]).first()
-                if lead:
-                    lead.recommendations_screenshot_url = detail["url"]
+        # Process each lead one by one (default/original behavior)
+        print("🚀 Starting default capture (one by one)...")
+        success = 0
+        failed = 0
+        details = []
+        for lead in leads:
+            print(f"\n� Processing Lead ID {lead.id}: {lead.website_url}")
+            url = None
+            try:
+                url = capture_recommendations_screenshot(lead.id, lead.website_url)
+                if url:
+                    lead.recommendations_screenshot_url = url
                     db.commit()
-                    print(f"✅ Updated Lead ID {detail['lead_id']} with screenshot URL")
-        
+                    print(f"✅ Updated Lead ID {lead.id} with screenshot URL")
+                    success += 1
+                    details.append({"lead_id": lead.id, "status": "success", "url": url})
+                else:
+                    print(f"❌ Failed to capture screenshot for Lead ID {lead.id}")
+                    failed += 1
+                    details.append({"lead_id": lead.id, "status": "failed", "error": "No screenshot URL returned"})
+            except Exception as e:
+                print(f"❌ Exception for Lead ID {lead.id}: {e}")
+                failed += 1
+                details.append({"lead_id": lead.id, "status": "failed", "error": str(e)})
         print(f"\n📊 Bulk Recommendations Capture Complete!")
-        print(f"✅ Success: {capture_results['success']}")
-        print(f"❌ Failed: {capture_results['failed']}")
-        print(f"📋 Total: {capture_results['total']}")
-        
-        return capture_results
+        print(f"✅ Success: {success}")
+        print(f"❌ Failed: {failed}")
+        print(f"📋 Total: {len(leads)}")
+        return {"success": success, "failed": failed, "total": len(leads), "details": details}
         
     except Exception as e:
         print(f"❌ Bulk recommendations capture failed: {str(e)}")
