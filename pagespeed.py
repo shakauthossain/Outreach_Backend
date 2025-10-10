@@ -324,23 +324,40 @@ def bulk_capture_recommendations_with_session(leads_data: list) -> dict:
             context = browser.new_context(viewport={"width": 1920, "height": 1080})
             page = context.new_page()
             
-            # Login once at the beginning
+            # Login once at the beginning, with increased timeout and one retry
             print("🔐 Logging in to frontend...")
             login_url = f"{FRONTEND_URL}/login"
-            page.goto(login_url, wait_until="networkidle", timeout=30000)
-            
-            try:
-                # Fill login form
-                time.sleep(2)
-                page.fill('input[type="email"]', FRONTEND_LOGIN_EMAIL, timeout=5000)
-                page.fill('input[type="password"]', FRONTEND_LOGIN_PASSWORD, timeout=5000)
-                page.click('button[type="submit"]', timeout=5000)
-                
-                # Wait for successful login
-                page.wait_for_url(lambda url: "/login" not in url, timeout=10000)
-                print("✅ Login successful - session established")
-            except Exception as e:
-                print(f"❌ Login failed: {e}")
+            login_success = False
+            login_attempts = 0
+            max_attempts = 2
+            last_error = None
+            while not login_success and login_attempts < max_attempts:
+                try:
+                    print(f"🔁 Login attempt {login_attempts + 1}...")
+                    page.goto(login_url, wait_until="networkidle", timeout=60000)
+                    time.sleep(2)
+                    page.fill('input[type="email"]', FRONTEND_LOGIN_EMAIL, timeout=10000)
+                    page.fill('input[type="password"]', FRONTEND_LOGIN_PASSWORD, timeout=10000)
+                    page.click('button[type="submit"]', timeout=10000)
+                    # Wait for successful login
+                    page.wait_for_url(lambda url: "/login" not in url, timeout=20000)
+                    print("✅ Login successful - session established")
+                    login_success = True
+                except Exception as e:
+                    last_error = e
+                    print(f"❌ Login failed (attempt {login_attempts + 1}): {e}")
+                    # Optionally, take a debug screenshot
+                    try:
+                        page.screenshot(path=f"debug_login_failed_attempt_{login_attempts + 1}.png")
+                        print(f"💾 Saved debug screenshot: debug_login_failed_attempt_{login_attempts + 1}.png")
+                    except Exception as se:
+                        print(f"⚠️ Could not save debug screenshot: {se}")
+                    login_attempts += 1
+                    if login_attempts < max_attempts:
+                        print("🔄 Retrying login...")
+                        time.sleep(2)
+            if not login_success:
+                print(f"❌ Login failed after {max_attempts} attempts: {last_error}")
                 browser.close()
                 results["failed"] = len(leads_data)
                 return results

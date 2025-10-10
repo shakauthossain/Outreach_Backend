@@ -68,6 +68,17 @@ async def get_screenshot(domain: str, strategy: str):
     else:
         raise HTTPException(status_code=404, detail="Screenshot not found")
 
+@app.get("/{domain}-recommendations.png")
+async def get_recommendations_screenshot(domain: str):
+    # Sanitize the domain to match the file storage structure
+    sanitized_domain = sanitize_domain(domain)
+    # Construct the file path
+    file_path = os.path.join(STATIC_DIR, sanitized_domain, f"{sanitized_domain}-recommendations.png")
+    # Check if the file exists
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    else:
+        raise HTTPException(status_code=404, detail="Screenshot not found")
 
 # Mount the static files directory to serve other static files
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
