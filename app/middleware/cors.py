@@ -16,10 +16,13 @@ def setup_cors(app: FastAPI) -> None:
     # Parse allowed origins from settings
     allowed_origins = []
     
-    if settings.CORS_ORIGINS:
+    if hasattr(settings, 'CORS_ORIGINS') and settings.CORS_ORIGINS:
         # Split by comma and strip whitespace
         origins = [origin.strip() for origin in settings.CORS_ORIGINS.split(",")]
         allowed_origins.extend(origins)
+    elif hasattr(settings, 'ALLOWED_ORIGINS') and settings.ALLOWED_ORIGINS:
+        # Use ALLOWED_ORIGINS from config
+        allowed_origins.extend(settings.ALLOWED_ORIGINS)
     
     # Add development origins if not in production
     if not settings.is_production:

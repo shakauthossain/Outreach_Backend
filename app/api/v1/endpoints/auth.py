@@ -3,7 +3,7 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -29,6 +29,7 @@ router = APIRouter()
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(get_rate_limit("auth_register"))
 async def register(
+    request: Request,
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
 ):
@@ -73,6 +74,7 @@ async def register(
 @router.post("/login", response_model=Token)
 @limiter.limit(get_rate_limit("auth_login"))
 async def login(
+    request: Request,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: AsyncSession = Depends(get_db),
 ):
@@ -114,12 +116,14 @@ async def login(
         "access_token": access_token,
         "refresh_token": refresh_token,
         "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert minutes to seconds
     }
 
 
 @router.post("/refresh", response_model=Token)
 @limiter.limit(get_rate_limit("auth_refresh"))
 async def refresh_token(
+    request: Request,
     refresh_token: str,
     db: AsyncSession = Depends(get_db),
 ):
@@ -160,6 +164,7 @@ async def refresh_token(
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
         "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Convert minutes to seconds
     }
 
 

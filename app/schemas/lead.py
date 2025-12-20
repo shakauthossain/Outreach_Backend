@@ -120,6 +120,8 @@ class LeadResponse(LeadBase):
 
 class LeadListQuery(BaseModel):
     """Query parameters for listing leads"""
+    page: int = Field(default=1, ge=1, description="Page number (1-indexed)")
+    page_size: int = Field(default=100, ge=1, le=1000, description="Items per page")
     search: Optional[str] = Field(None, description="Search by company name")
     mail_sent: Optional[bool] = Field(None, description="Filter by mail sent status")
     has_speed_test: Optional[bool] = Field(None, description="Filter by speed test completion")
@@ -131,6 +133,16 @@ class LeadListQuery(BaseModel):
     conversation_id: Optional[str] = Field(None, description="Filter by GHL conversation")
     sort_by: str = Field(default="created_at", description="Sort field")
     sort_order: str = Field(default="desc", description="Sort order: asc or desc")
+    
+    @property
+    def skip(self) -> int:
+        """Calculate skip offset from page and page_size"""
+        return (self.page - 1) * self.page_size
+    
+    @property
+    def limit(self) -> int:
+        """Return page_size as limit"""
+        return self.page_size
     
     @field_validator('sort_order')
     @classmethod
@@ -181,3 +193,21 @@ class CSVColumnMapping(BaseModel):
     contact_name: Optional[str] = None
     location: Optional[str] = None
     industry: Optional[str] = None
+
+
+class LeadListResponse(BaseModel):
+    """Response schema for paginated lead list"""
+    leads: list[LeadResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class BulkLeadResponse(BaseModel):
+    """Response schema for bulk operations"""
+    successful_count: int
+    failed_count: int
+    errors: list[str] = []
+    created_ids: list[int] = []
+

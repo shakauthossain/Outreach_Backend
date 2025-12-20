@@ -67,6 +67,10 @@ class TokenResponse(BaseModel):
     expires_in: int = Field(description="Token expiration in seconds")
 
 
+# Alias for backward compatibility
+Token = TokenResponse
+
+
 class TokenPayload(BaseModel):
     """Schema for JWT token payload"""
     sub: str = Field(description="Subject (user ID)")

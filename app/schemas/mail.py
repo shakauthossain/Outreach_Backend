@@ -2,7 +2,8 @@
 Mail generation and email schemas.
 """
 from typing import Optional, List
-from pydantic import BaseModel, Field, EmailStr
+from datetime import datetime
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 
 class MailGenerateRequest(BaseModel):
@@ -118,3 +119,9 @@ class EmailTemplateResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+# Aliases for backward compatibility
+MailGenerationRequest = MailGenerateRequest
+MailGenerationResponse = MailGenerateResponse
+

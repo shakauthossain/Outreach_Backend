@@ -33,8 +33,14 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         # In production, use Alembic migrations instead
         if not settings.is_production:
-            print("📊 Creating database tables...")
-            await conn.run_sync(Base.metadata.create_all)
+            try:
+                print("📊 Creating database tables...")
+                await conn.run_sync(Base.metadata.create_all)
+                print("✅ Database tables created successfully")
+            except Exception as e:
+                # Tables might already exist, that's okay
+                print(f"⚠️  Database tables might already exist: {str(e)[:100]}")
+                print("✅ Continuing with existing database schema")
     
     # Connect to Redis
     print("📡 Connecting to Redis...")
@@ -45,7 +51,7 @@ async def lifespan(app: FastAPI):
     
     print("✅ Application startup complete")
     print(f"🌍 Environment: {'Production' if settings.is_production else 'Development'}")
-    print(f"🔒 CORS origins: {settings.CORS_ORIGINS}")
+    print(f"🔒 CORS origins: {settings.ALLOWED_ORIGINS}")
     
     yield
     

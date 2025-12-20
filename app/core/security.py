@@ -200,7 +200,7 @@ def create_refresh_token(subject: str | int) -> str:
         Encoded JWT refresh token
     """
     expire = datetime.utcnow() + timedelta(
-        minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES
+        days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
     
     to_encode = {

@@ -1,7 +1,7 @@
 """Lead management endpoints."""
 
 from typing import List
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -27,6 +27,7 @@ router = APIRouter()
 @router.get("/", response_model=LeadListResponse)
 @limiter.limit(get_rate_limit("leads_read"))
 async def list_leads(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     search: str = Query(None),
@@ -76,17 +77,18 @@ async def list_leads(
     leads, total = await LeadService.list_leads(db, query)
     
     return LeadListResponse(
-        items=[LeadResponse.model_validate(lead) for lead in leads],
+        leads=[LeadResponse.model_validate(lead) for lead in leads],
         total=total,
         page=page,
         page_size=page_size,
-        pages=(total + page_size - 1) // page_size,
+        total_pages=(total + page_size - 1) // page_size,
     )
 
 
 @router.get("/statistics", response_model=LeadStatistics)
 @limiter.limit(get_rate_limit("leads_read"))
 async def get_lead_statistics(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -106,6 +108,7 @@ async def get_lead_statistics(
 @router.get("/{lead_id}", response_model=LeadResponse)
 @limiter.limit(get_rate_limit("leads_read"))
 async def get_lead(
+    request: Request,
     lead_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -131,6 +134,7 @@ async def get_lead(
 @router.post("/", response_model=LeadResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(get_rate_limit("leads_create"))
 async def create_lead(
+    request: Request,
     lead_data: LeadCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -153,6 +157,7 @@ async def create_lead(
 @router.put("/{lead_id}", response_model=LeadResponse)
 @limiter.limit(get_rate_limit("leads_update"))
 async def update_lead(
+    request: Request,
     lead_id: int,
     lead_data: LeadUpdate,
     db: AsyncSession = Depends(get_db),
@@ -177,6 +182,7 @@ async def update_lead(
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit(get_rate_limit("leads_delete"))
 async def delete_lead(
+    request: Request,
     lead_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -198,6 +204,7 @@ async def delete_lead(
 @router.post("/bulk", response_model=BulkLeadResponse)
 @limiter.limit(get_rate_limit("bulk_operations"))
 async def bulk_create_leads(
+    request: Request,
     leads_data: List[LeadCreate],
     skip_duplicates: bool = Query(True),
     db: AsyncSession = Depends(get_db),
@@ -230,6 +237,7 @@ async def bulk_create_leads(
 @router.patch("/bulk", response_model=BulkLeadResponse)
 @limiter.limit(get_rate_limit("bulk_operations"))
 async def bulk_update_leads(
+    request: Request,
     operation: BulkLeadOperation,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),

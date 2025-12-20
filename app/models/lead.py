@@ -60,9 +60,24 @@ class Lead(Base):
     
     # Additional Metadata
     contact_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    linkedin_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     location: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     industry: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Email fields
+    generated_email: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    email_subject: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    final_email: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Individual punchlines (for backward compatibility with old system)
+    punchline1: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    punchline2: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    punchline3: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # GoHighLevel Integration
+    ghl_contact_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(

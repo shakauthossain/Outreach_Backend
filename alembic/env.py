@@ -1,5 +1,11 @@
 """Alembic database migrations configuration."""
 
+import sys
+from pathlib import Path
+
+# Add parent directory to path so we can import app
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from logging.config import fileConfig
 
 from sqlalchemy import pool
@@ -26,7 +32,7 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 # Get database URL from settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL_ASYNC)
+config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 
 def run_migrations_offline() -> None:
@@ -71,7 +77,7 @@ async def run_migrations_online() -> None:
     and associate a connection with the context.
     """
     connectable = create_async_engine(
-        settings.DATABASE_URL_ASYNC,
+        settings.DATABASE_URL,
         poolclass=pool.NullPool,
     )
 
