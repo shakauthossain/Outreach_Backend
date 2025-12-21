@@ -44,60 +44,52 @@ class SpeedTestService:
         if not lead:
             raise ValueError(f"Lead {lead_id} not found")
         
+        # Generate unique task ID
+        import uuid
+        task_id = str(uuid.uuid4())
+        
         # Create task
         task = Task(
-            lead_id=lead_id,
-            task_type=TaskType.SPEEDTEST,
+            task_id=task_id,
+            task_type=TaskType.SPEED_TEST,
+            task_name=f"Speed test for lead {lead_id}",
             status=TaskStatus.PENDING,
-            metadata={"website_url": str(lead.website_url)}
+            metadata={"lead_id": lead_id, "website_url": str(lead.website_url)}
         )
         db.add(task)
         await db.commit()
         await db.refresh(task)
         
-        # TODO: Queue Celery task instead of running synchronously
-        # For now, run synchronously
+        # Queue Celery task for async processing
         try:
-            task.status = TaskStatus.RUNNING
+            from app.tasks.speedtest_tasks import analyze_single_speedtest
+            
+            celery_task = analyze_single_speedtest.apply_async(
+                args=[lead_id, ["mobile", "desktop"]],
+                task_id=task.task_id
+            )
+            
+            # Update task with queued status
+            task.status = TaskStatus.PENDING
+            task.metadata["celery_task_id"] = celery_task.id
             await db.commit()
             
-            # Run tests
-            desktop_data = await SpeedTestService._fetch_pagespeed_data(
-                str(lead.website_url), "desktop"
-            )
-            mobile_data = await SpeedTestService._fetch_pagespeed_data(
-                str(lead.website_url), "mobile"
-            )
-            
-            # Update lead with results
-            if desktop_data:
-                lead.website_speed_web = desktop_data.get("performance_score")
-                lead.accessibility_score = desktop_data.get("accessibility_score")
-                lead.seo_score = desktop_data.get("seo_score")
-                lead.best_practices_score = desktop_data.get("best_practices_score")
-                lead.screenshot_url_web = desktop_data.get("screenshot")
-            
-            if mobile_data:
-                lead.website_speed_mobile = mobile_data.get("performance_score")
-                lead.screenshot_url_mobile = mobile_data.get("screenshot")
-                lead.recommendations = mobile_data.get("diagnostics")
-            
-            lead.updated_at = datetime.utcnow()
-            task.status = TaskStatus.COMPLETED
-            task.result = {"desktop": desktop_data, "mobile": mobile_data}
-            
+            return {
+                "task_id": task.task_id,
+                "celery_task_id": celery_task.id,
+                "lead_id": lead_id,
+                "status": "queued",
+                "message": "Speed test queued for processing"
+            }
         except Exception as e:
-            task.status = TaskStatus.FAILED
-            task.error = str(e)
-            raise
-        finally:
-            await db.commit()
-        
-        return {
-            "task_id": str(task.task_id),
-            "status": task.status.value,
-            "lead_id": lead_id
-        }
+            # Fallback: If Celery/Redis unavailable, return task for manual processing
+            print(f"Celery unavailable: {e}. Task created but not queued.")
+            return {
+                "task_id": task.task_id,
+                "lead_id": lead_id,
+                "status": "created",
+                "message": "Speed test task created. Background worker required to process."
+            }
     
     @staticmethod
     async def run_bulk_speed_test(
@@ -131,9 +123,15 @@ class SpeedTestService:
                 "count": 0
             }
         
+        # Generate unique task ID
+        import uuid
+        task_id = str(uuid.uuid4())
+        
         # Create batch task
         batch_task = Task(
-            task_type=TaskType.BULK_SPEEDTEST,
+            task_id=task_id,
+            task_type=TaskType.BULK_OPERATION,
+            task_name="Bulk speed test",
             status=TaskStatus.PENDING,
             metadata={
                 "total_leads": len(leads),
@@ -144,37 +142,39 @@ class SpeedTestService:
         await db.commit()
         await db.refresh(batch_task)
         
-        # TODO: Queue Celery task for async processing
-        # For now, process sequentially (not recommended for production)
-        batch_task.status = TaskStatus.RUNNING
-        await db.commit()
-        
-        processed = 0
-        failed = 0
-        
-        for lead in leads:
-            try:
-                await SpeedTestService.run_speed_test(db, lead.id)
-                processed += 1
-            except Exception as e:
-                failed += 1
-                print(f"Failed to test lead {lead.id}: {e}")
-        
-        batch_task.status = TaskStatus.COMPLETED
-        batch_task.result = {
-            "processed": processed,
-            "failed": failed,
-            "total": len(leads)
-        }
-        await db.commit()
-        
-        return {
-            "task_id": str(batch_task.task_id),
-            "status": batch_task.status.value,
-            "processed": processed,
-            "failed": failed,
-            "total": len(leads)
-        }
+        # Queue Celery task for async bulk processing
+        try:
+            from app.tasks.speedtest_tasks import analyze_bulk_speedtest
+            
+            lead_ids = [lead.id for lead in leads]
+            celery_task = analyze_bulk_speedtest.apply_async(
+                args=[lead_ids, ["mobile", "desktop"]],
+                task_id=batch_task.task_id
+            )
+            
+            # Update task with queued status
+            batch_task.status = TaskStatus.PENDING
+            batch_task.metadata["celery_task_id"] = celery_task.id
+            batch_task.metadata["total_leads"] = len(lead_ids)
+            await db.commit()
+            
+            return {
+                "task_id": batch_task.task_id,
+                "celery_task_id": celery_task.id,
+                "total_leads": len(lead_ids),
+                "status": "queued",
+                "message": f"Bulk speed test queued for {len(lead_ids)} leads"
+            }
+        except Exception as e:
+            # Fallback: If Celery/Redis unavailable
+            print(f"Celery unavailable: {e}. Task created but not queued.")
+            lead_ids = [lead.id for lead in leads]
+            return {
+                "task_id": batch_task.task_id,
+                "total_leads": len(lead_ids),
+                "status": "created",
+                "message": f"Bulk speed test task created for {len(lead_ids)} leads. Background worker required."
+            }
     
     @staticmethod
     async def _fetch_pagespeed_data(

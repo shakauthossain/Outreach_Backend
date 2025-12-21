@@ -51,20 +51,28 @@ class PageSpeedClient:
         if categories is None:
             categories = ["performance", "accessibility", "seo", "best-practices"]
         
-        # Build query parameters
+        # Build query parameters - need to pass category multiple times
         params = {
             "url": url,
             "key": self.api_key,
             "strategy": strategy,
         }
         
-        # Add categories
+        # Build params list with multiple category values
+        # httpx doesn't support duplicate keys in dict, so build manually
+        param_list = [
+            ("url", url),
+            ("key", self.api_key),
+            ("strategy", strategy),
+        ]
+        
+        # Add each category as separate parameter
         for category in categories:
-            params[f"category"] = category
+            param_list.append(("category", category))
         
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(self.BASE_URL, params=params)
+                response = await client.get(self.BASE_URL, params=param_list)
                 
                 # Check for quota exceeded
                 if response.status_code == 429:
@@ -75,11 +83,15 @@ class PageSpeedClient:
                 
                 # Check for other errors
                 if response.status_code != 200:
+                    error_detail = response.text[:500]
+                    print(f"PageSpeed API Error for {url}: {response.status_code}")
+                    print(f"Response: {error_detail}")
                     raise ExternalAPIError(
                         f"PageSpeed API error: {response.status_code}",
                         detail={
                             "status_code": response.status_code,
-                            "response": response.text[:500]
+                            "response": error_detail,
+                            "url": url
                         }
                     )
                 

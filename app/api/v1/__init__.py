@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from .endpoints import auth, leads, health, speedtest, punchlines, emails
+from .endpoints import auth, leads, health, speedtest, punchlines, emails, tasks
 
 api_router = APIRouter()
 
@@ -13,3 +13,4 @@ api_router.include_router(leads.router, prefix="/leads", tags=["leads"])
 api_router.include_router(speedtest.router, prefix="/speedtest", tags=["speedtest"])
 api_router.include_router(punchlines.router, prefix="/punchlines", tags=["punchlines"])
 api_router.include_router(emails.router, prefix="/emails", tags=["emails"])
+api_router.include_router(tasks.router, prefix="/task-status", tags=["tasks"])

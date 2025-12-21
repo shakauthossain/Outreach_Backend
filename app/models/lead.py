@@ -39,13 +39,17 @@ class Lead(Base):
     seo_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     best_practices_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
-    # Screenshot URLs
-    screenshot_url_web: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    screenshot_url_mobile: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    recommendations_screenshot_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    # Screenshot URLs (stored as data URLs - base64 encoded images)
+    screenshot_url_web: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    screenshot_url_mobile: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    recommendations_screenshot_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Recommendations Data (stored as JSON string)
     recommendations: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # PageSpeed Metrics (stored as JSON strings with detailed performance diagnostics)
+    pagespeed_metrics_mobile: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    pagespeed_metrics_desktop: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Email Generation
     subject_line: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

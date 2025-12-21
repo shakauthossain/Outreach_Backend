@@ -222,17 +222,39 @@ class PunchlineService:
         if not lead.company or not lead.website_url:
             raise ValueError(f"Lead {lead_id} missing company or website_url")
         
-        # For now, use simple evidence from lead data
-        # TODO: Integrate with web scraping to get real evidence
+        # Build evidence from lead data and optionally scrape website
         evidence = [
             f"Company {lead.company} has a website at {lead.website_url}",
         ]
         
         if lead.website_speed_web:
-            evidence.append(f"Website has a PageSpeed score of {lead.website_speed_web}")
+            evidence.append(f"Desktop PageSpeed score: {lead.website_speed_web}/100")
+        
+        if lead.website_speed_mobile:
+            evidence.append(f"Mobile PageSpeed score: {lead.website_speed_mobile}/100")
         
         if lead.seo_score:
-            evidence.append(f"SEO score: {lead.seo_score}")
+            evidence.append(f"SEO score: {lead.seo_score}/100")
+        
+        if lead.accessibility_score:
+            evidence.append(f"Accessibility score: {lead.accessibility_score}/100")
+        
+        if lead.best_practices_score:
+            evidence.append(f"Best practices score: {lead.best_practices_score}/100")
+        
+        # Optionally scrape website for additional evidence
+        try:
+            from app.integrations.firecrawl import firecrawl_client
+            scraped = await firecrawl_client.scrape_url(
+                str(lead.website_url),
+                formats=["markdown"]
+            )
+            content = scraped.get("data", {}).get("markdown", "")
+            if content:
+                # Extract key facts from content (first 500 chars)
+                evidence.append(f"Website content preview: {content[:500]}")
+        except Exception as e:
+            print(f"Could not scrape website for evidence: {e}")
         
         # Generate punchlines
         messages = PunchlineService._build_prompt(

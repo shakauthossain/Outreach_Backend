@@ -168,10 +168,21 @@ Make it personalized and relevant to their specific performance issues.
         )
         
         # Generate content using LLM
-        # This will be implemented with actual LLM integration
-        # For now, return a template-based response
-        
-        generated_body = MailService._generate_template_mail(context, request)
+        try:
+            from app.services.llm_provider import get_llm_client
+            
+            llm = get_llm_client(temperature=0.7)
+            response = llm.invoke(prompt)
+            
+            # Extract content
+            if hasattr(response, 'content'):
+                generated_body = response.content.strip()
+            else:
+                generated_body = str(response).strip()
+                
+        except Exception as e:
+            print(f"LLM generation failed: {e}, using template")
+            generated_body = MailService._generate_template_mail(context, request)
         
         # Generate subject line
         subject = MailService._generate_subject_line(context)

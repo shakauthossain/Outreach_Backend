@@ -23,7 +23,8 @@ if settings.DEBUG:
             "server_settings": {"application_name": settings.APP_NAME},
             "command_timeout": 60,
             "timeout": 10,
-            "ssl": "require"
+            "ssl": "require",
+            "prepared_statement_cache_size": 0  # Disable prepared statement cache to avoid schema change issues
         },
         execution_options={
             "isolation_level": "READ COMMITTED"
@@ -44,7 +45,8 @@ else:
             "server_settings": {"application_name": settings.APP_NAME},
             "command_timeout": 60,
             "timeout": 10,
-            "ssl": "require"
+            "ssl": "require",
+            "prepared_statement_cache_size": 0  # Disable prepared statement cache to avoid schema change issues
         },
         execution_options={
             "isolation_level": "READ COMMITTED"

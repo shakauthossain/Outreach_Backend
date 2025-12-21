@@ -1,12 +1,15 @@
 """Speed test background tasks."""
 
 import asyncio
+import json
 from typing import Dict, Any
+from datetime import datetime
 
 from app.tasks.celery_app import celery_app
 from app.integrations.pagespeed import pagespeed_client
 from app.db.session import AsyncSessionLocal
 from app.models.lead import Lead
+from app.models.task import Task, TaskStatus
 from sqlalchemy import select
 
 
@@ -57,6 +60,19 @@ async def _run_speedtest(task, lead_id: int, strategies: list[str]) -> Dict[str,
         Speed test results
     """
     async with AsyncSessionLocal() as db:
+        # Update Task record in database - mark as started
+        task_record = None
+        if hasattr(task, 'request') and task.request.id:
+            stmt = select(Task).where(Task.task_id == task.request.id)
+            result = await db.execute(stmt)
+            task_record = result.scalar_one_or_none()
+            
+            if task_record:
+                task_record.status = TaskStatus.STARTED
+                task_record.started_at = datetime.utcnow()
+                task_record.progress = 0
+                await db.commit()
+        
         # Get lead
         result = await db.execute(
             select(Lead).where(Lead.id == lead_id)
@@ -64,12 +80,19 @@ async def _run_speedtest(task, lead_id: int, strategies: list[str]) -> Dict[str,
         lead = result.scalar_one_or_none()
         
         if not lead:
+            # Update task as failed
+            if task_record:
+                task_record.status = TaskStatus.FAILURE
+                task_record.error = f"Lead {lead_id} not found"
+                task_record.completed_at = datetime.utcnow()
+                await db.commit()
             raise ValueError(f"Lead {lead_id} not found")
         
         results = {}
         
         # Analyze each strategy
         for i, strategy in enumerate(strategies):
+            # Update Celery state
             task.update_state(
                 state="PROGRESS",
                 meta={
@@ -79,6 +102,14 @@ async def _run_speedtest(task, lead_id: int, strategies: list[str]) -> Dict[str,
                     "url": lead.website_url,
                 }
             )
+            
+            # Update Task record progress
+            if task_record:
+                task_record.progress = int((i / len(strategies)) * 100)
+                task_record.current_step = f"Analyzing {strategy}"
+                task_record.processed_items = i
+                task_record.total_items = len(strategies)
+                await db.commit()
             
             try:
                 result = await pagespeed_client.analyze_url(
@@ -91,20 +122,75 @@ async def _run_speedtest(task, lead_id: int, strategies: list[str]) -> Dict[str,
                 scores = result.get("scores", {})
                 if strategy == "mobile":
                     lead.website_speed_mobile = scores.get("performance", 0)
-                    lead.mobile_accessibility_score = scores.get("accessibility", 0)
-                    lead.mobile_seo_score = scores.get("seo", 0)
-                    lead.mobile_best_practices_score = scores.get("best_practices", 0)
+                    # Store mobile-specific scores if needed in the future
+                    # For now, use desktop scores for all metrics
                 elif strategy == "desktop":
                     lead.website_speed_web = scores.get("performance", 0)
                     lead.accessibility_score = scores.get("accessibility", 0)
                     lead.seo_score = scores.get("seo", 0)
                     lead.best_practices_score = scores.get("best_practices", 0)
                 
+                # Capture screenshot from raw data if available
+                raw_data = result.get("raw_data", {})
+                lighthouse = raw_data.get("lighthouseResult", {})
+                audits = lighthouse.get("audits", {})
+                screenshot_audit = audits.get("final-screenshot", {})
+                screenshot_data = screenshot_audit.get("details", {}).get("data", "")
+                
+                if screenshot_data:
+                    # Store full screenshot data URL (base64 encoded)
+                    if strategy == "mobile":
+                        lead.screenshot_url_mobile = screenshot_data
+                    elif strategy == "desktop":
+                        lead.screenshot_url_web = screenshot_data
+                
+                # Store detailed PageSpeed metrics for Performance Diagnostics
+                # Extract audit data for FCP, LCP, TBT, CLS, Speed Index
+                metrics_to_store = {}
+                metric_keys = [
+                    "first-contentful-paint",
+                    "largest-contentful-paint", 
+                    "total-blocking-time",
+                    "cumulative-layout-shift",
+                    "speed-index"
+                ]
+                
+                for metric_key in metric_keys:
+                    if metric_key in audits:
+                        audit_data = audits[metric_key]
+                        metrics_to_store[metric_key] = {
+                            "displayValue": audit_data.get("displayValue"),
+                            "numericValue": audit_data.get("numericValue"),
+                            "score": audit_data.get("score")
+                        }
+                
+                # Store metrics as JSON string
+                if metrics_to_store:
+                    metrics_json = json.dumps(metrics_to_store)
+                    if strategy == "mobile":
+                        lead.pagespeed_metrics_mobile = metrics_json
+                    elif strategy == "desktop":
+                        lead.pagespeed_metrics_desktop = metrics_json
+                
             except Exception as e:
-                results[strategy] = {"error": str(e)}
+                error_msg = str(e)
+                results[strategy] = {"error": error_msg}
+                print(f"Error testing {lead.website_url} ({strategy}): {error_msg}")
+                
+                # Don't update scores if there's an error - keep existing values
+                # This prevents overwriting good scores with 0
         
-        # Save lead
+        # Save lead (even if some strategies failed)
         await db.commit()
+        
+        # Update Task record as completed
+        if task_record:
+            task_record.status = TaskStatus.SUCCESS
+            task_record.progress = 100
+            task_record.current_step = "Completed"
+            task_record.completed_at = datetime.utcnow()
+            task_record.processed_items = len(strategies)
+            await db.commit()
         
         return {
             "lead_id": lead_id,

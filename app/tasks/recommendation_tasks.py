@@ -63,8 +63,8 @@ async def _capture_recommendations(lead_id: int) -> Dict[str, Any]:
         
         content = scraped.get("data", {}).get("markdown", "")
         
-        # Generate recommendations based on content and speed scores
-        recommendations = _generate_recommendations(lead, content)
+        # Generate recommendations using AI analysis
+        recommendations = await _generate_ai_recommendations(lead, content)
         
         # Update lead
         lead.recommendations = "\n".join(recommendations)
@@ -148,6 +148,76 @@ def _generate_recommendations(lead: Lead, content: str) -> list[str]:
         )
     
     return recommendations
+
+
+async def _generate_ai_recommendations(lead: Lead, content: str) -> list[str]:
+    """
+    Generate AI-powered recommendations based on lead data and website content.
+    
+    Args:
+        lead: Lead model
+        content: Website content
+        
+    Returns:
+        List of AI-generated recommendations
+    """
+    from app.services.llm_provider import get_llm_client
+    
+    # Build context for AI
+    context = f"""Website Performance Analysis:
+- Company: {lead.company}
+- URL: {lead.website_url}
+- Desktop Performance: {lead.website_speed_web or 'Not tested'}/100
+- Mobile Performance: {lead.website_speed_mobile or 'Not tested'}/100
+- SEO Score: {lead.seo_score or 'Not tested'}/100
+- Accessibility Score: {lead.accessibility_score or 'Not tested'}/100
+- Best Practices Score: {lead.best_practices_score or 'Not tested'}/100
+
+Website Content Preview:
+{content[:1000] if content else 'No content available'}
+"""
+    
+    prompt = f"""{context}
+
+Based on this website analysis, generate 3-5 specific, actionable recommendations to improve their web performance and user experience.
+
+Format each recommendation as:
+[Icon] [Priority]: [Specific action with technical details]
+
+Use these icons:
+🚀 for critical performance issues
+⚡ for important optimizations
+🔍 for SEO improvements
+♿ for accessibility fixes
+🖼️ for image/media optimizations
+🎯 for best practice recommendations
+
+Make recommendations specific, technical, and actionable. Focus on the biggest impact areas based on the scores.
+
+Recommendations:"""
+    
+    try:
+        llm = get_llm_client(temperature=0.5)
+        response = llm.invoke(prompt)
+        
+        # Extract content
+        if hasattr(response, 'content'):
+            recommendations_text = response.content.strip()
+        else:
+            recommendations_text = str(response).strip()
+        
+        # Split into individual recommendations
+        recommendations = [line.strip() for line in recommendations_text.split('\n') if line.strip() and not line.strip().startswith('Recommendations:')]
+        
+        # If AI didn't generate good recommendations, fall back to rule-based
+        if len(recommendations) < 3:
+            return _generate_recommendations(lead, content)
+        
+        return recommendations[:5]  # Limit to 5 recommendations
+        
+    except Exception as e:
+        print(f"AI recommendation generation failed: {e}, using rule-based")
+        return _generate_recommendations(lead, content)
 
 
 @celery_app.task(

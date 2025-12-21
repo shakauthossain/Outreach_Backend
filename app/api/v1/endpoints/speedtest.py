@@ -81,7 +81,7 @@ async def run_bulk_speed_test(
     try:
         result = await SpeedTestService.run_bulk_speed_test(db, untested_only)
         
-        if "message" in result:
+        if "message" in result and "count" in result:
             return SpeedTestResponse(
                 task_id="",
                 status="completed",
@@ -89,7 +89,15 @@ async def run_bulk_speed_test(
                 total=result["count"]
             )
         
-        return SpeedTestResponse(**result)
+        # Map total_leads to total for response
+        response_data = {
+            "task_id": result.get("task_id", ""),
+            "status": result.get("status", "unknown"),
+            "message": result.get("message"),
+            "total": result.get("total_leads")
+        }
+        
+        return SpeedTestResponse(**response_data)
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

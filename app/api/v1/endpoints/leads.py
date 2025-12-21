@@ -1,8 +1,11 @@
 """Lead management endpoints."""
 
 from typing import List
-from fastapi import APIRouter, Depends, Query, status, Request
+from fastapi import APIRouter, Depends, Query, status, HTTPException, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+import csv
+import io
 
 from app.db.session import get_db
 from app.models.user import User
@@ -17,11 +20,14 @@ from app.schemas.lead import (
     BulkLeadResponse,
 )
 from app.services.lead_service import LeadService
-from app.core.security import get_current_active_user
+from app.core.security import get_current_user, get_current_active_user
 from app.core.rate_limit import limiter, get_rate_limit
 from app.core.exceptions import NotFoundError
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional
 
 router = APIRouter()
+security = HTTPBearer(auto_error=False)
 
 
 @router.get("/", response_model=LeadListResponse)
@@ -260,3 +266,93 @@ async def bulk_update_leads(
         failed_count=len(errors),
         errors=errors,
     )
+
+
+@router.get("/download-csv")
+async def download_csv(
+    ids: Optional[str] = Query(None, description="Comma-separated lead IDs (empty for all)"),
+    columns: Optional[str] = Query(None, description="Comma-separated column names"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Download leads as CSV file.
+    
+    Args:
+        ids: Comma-separated lead IDs (empty for all leads)
+        columns: Comma-separated column names to include
+        db: Database session
+        
+    Returns:
+        CSV file as streaming response
+    """
+    
+    print(f"CSV Download - IDs: '{ids}', Columns: '{columns}'")
+    
+    try:
+        # Parse IDs
+        lead_ids = []
+        if ids:
+            try:
+                lead_ids = [int(id.strip()) for id in ids.split(",") if id.strip()]
+            except ValueError:
+                lead_ids = []
+        
+        # Parse columns
+        selected_columns = []
+        if columns:
+            selected_columns = [col.strip() for col in columns.split(",") if col.strip()]
+        
+        # Default columns if none specified
+        if not selected_columns:
+            selected_columns = [
+                "id", "company", "website_url", "email", "phone",
+                "contact_name", "website_speed_web", "website_speed_mobile"
+            ]
+        
+        # Fetch leads
+        if lead_ids:
+            leads = await LeadService.get_leads_by_ids(db, lead_ids)
+        else:
+            # Get all leads (up to a reasonable limit)
+            query = LeadListQuery(page=1, page_size=10000)
+            leads, _ = await LeadService.list_leads(db, query)
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.DictWriter(output, fieldnames=selected_columns, extrasaction='ignore')
+        writer.writeheader()
+        
+        for lead in leads:
+            row_data = {}
+            for col in selected_columns:
+                # Handle special field mappings
+                if col == "first_name":
+                    row_data[col] = getattr(lead, 'contact_name', '').split()[0] if getattr(lead, 'contact_name', None) else ''
+                elif col == "last_name":
+                    parts = getattr(lead, 'contact_name', '').split()
+                    row_data[col] = ' '.join(parts[1:]) if len(parts) > 1 else ''
+                elif hasattr(lead, col):
+                    value = getattr(lead, col)
+                    row_data[col] = value if value is not None else ''
+                else:
+                    row_data[col] = ''
+            
+            writer.writerow(row_data)
+        
+        # Prepare response
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=leads_export.csv"
+            }
+        )
+    except Exception as e:
+        print(f"CSV Download Error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate CSV: {str(e)}"
+        )

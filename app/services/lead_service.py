@@ -85,6 +85,31 @@ class LeadService:
         return result.scalar_one_or_none()
     
     @staticmethod
+    async def get_leads_by_ids(db: AsyncSession, lead_ids: List[int]) -> List[Lead]:
+        """
+        Get multiple leads by their IDs.
+        
+        Args:
+            db: Database session
+            lead_ids: List of lead IDs
+            
+        Returns:
+            List of Lead instances
+        """
+        if not lead_ids:
+            return []
+        
+        result = await db.execute(
+            select(Lead).where(
+                and_(
+                    Lead.id.in_(lead_ids),
+                    Lead.deleted_at.is_(None)
+                )
+            )
+        )
+        return list(result.scalars().all())
+    
+    @staticmethod
     async def list_leads(
         db: AsyncSession,
         query: LeadListQuery,

@@ -99,6 +99,10 @@ class LeadResponse(LeadBase):
     # Recommendations
     recommendations: Optional[str] = None
     
+    # PageSpeed Metrics (detailed performance diagnostics)
+    pagespeed_metrics_mobile: Optional[str] = None
+    pagespeed_metrics_desktop: Optional[str] = None
+    
     # Email
     subject_line: Optional[str] = None
     generated_mail: Optional[str] = None

@@ -82,7 +82,7 @@ async def _generate_punchline(lead_id: int, style: str) -> Dict[str, Any]:
 
 def _generate_punchline_text(context: Dict[str, Any], style: str) -> str:
     """
-    Generate punchline text based on context.
+    Generate punchline text using LLM based on context.
     
     Args:
         context: Lead context
@@ -91,15 +91,56 @@ def _generate_punchline_text(context: Dict[str, Any], style: str) -> str:
     Returns:
         Punchline text
     """
-    # Template-based punchline (replace with LLM in production)
-    avg = context.get("avg_performance", 0)
+    from app.services.llm_provider import get_llm_client
     
-    if avg < 50:
-        return f"Your site could be losing customers every second it takes to load."
-    elif avg < 75:
-        return f"Small speed improvements can lead to significant conversion increases."
-    else:
-        return f"Your site performs well, but there's always room for optimization."
+    avg = context.get("avg_performance", 0)
+    company = context.get("company", "this website")
+    web_speed = context.get("web_speed", 0)
+    mobile_speed = context.get("mobile_speed", 0)
+    
+    # Build prompt for LLM
+    prompt = f"""Generate a compelling, brief punchline (one sentence, max 15 words) for a web performance outreach email.
+
+Context:
+- Company: {company}
+- Desktop Speed: {web_speed}/100
+- Mobile Speed: {mobile_speed}/100
+- Average Performance: {avg}/100
+- Style: {style}
+
+The punchline should:
+1. Be attention-grabbing and relevant to their performance issues
+2. Create urgency without being pushy
+3. Focus on business impact (conversions, revenue, user experience)
+4. Be {style} in tone
+5. Be ONE sentence only
+
+Generate only the punchline, nothing else:"""
+    
+    try:
+        llm = get_llm_client(temperature=0.8)
+        response = llm.invoke(prompt)
+        
+        # Extract content from response
+        if hasattr(response, 'content'):
+            punchline = response.content.strip()
+        else:
+            punchline = str(response).strip()
+        
+        # Clean up the punchline
+        punchline = punchline.strip('"').strip("'").strip()
+        
+        return punchline
+        
+    except Exception as e:
+        print(f"LLM generation failed: {e}, using template")
+        # Fallback to template
+        if avg < 50:
+            return f"Your site could be losing customers every second it takes to load."
+        elif avg < 75:
+            return f"Small speed improvements can lead to significant conversion increases."
+        else:
+            return f"Your site performs well, but there's always room for optimization."
 
 
 @celery_app.task(
