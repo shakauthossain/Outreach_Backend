@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.db.session import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserResponse, Token
+from app.schemas.user import UserCreate, UserResponse, Token, UserUpdate, PasswordChange
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -182,3 +182,85 @@ async def get_current_user_info(
         Current user data
     """
     return current_user
+
+
+@router.put("/me", response_model=UserResponse)
+@limiter.limit(get_rate_limit("default"))
+async def update_current_user(
+    request: Request,
+    user_data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Update current user profile information.
+    
+    Args:
+        user_data: User update data
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Updated user data
+        
+    Raises:
+        DuplicateError: If email already exists
+    """
+    # Check if email is being changed and if it's already in use
+    if user_data.email is not None and user_data.email != current_user.email:
+        result = await db.execute(
+            select(User).where(User.email == user_data.email)
+        )
+        existing_user = result.scalar_one_or_none()
+        if existing_user:
+            raise DuplicateError("Email already in use")
+        current_user.email = user_data.email
+    
+    # Update user fields
+    if user_data.full_name is not None:
+        current_user.full_name = user_data.full_name
+    if user_data.phone is not None:
+        current_user.phone = user_data.phone
+    if user_data.company is not None:
+        current_user.company = user_data.company
+    if user_data.position is not None:
+        current_user.position = user_data.position
+    
+    await db.commit()
+    await db.refresh(current_user)
+    
+    return current_user
+
+
+@router.post("/change-password")
+@limiter.limit(get_rate_limit("default"))
+async def change_password(
+    request: Request,
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Change current user's password.
+    
+    Args:
+        password_data: Password change data (current and new password)
+        current_user: Current authenticated user
+        db: Database session
+        
+    Returns:
+        Success message
+        
+    Raises:
+        AuthenticationError: If current password is incorrect
+    """
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.hashed_password):
+        raise AuthenticationError("Current password is incorrect")
+    
+    # Update password
+    current_user.hashed_password = get_password_hash(password_data.new_password)
+    
+    await db.commit()
+    
+    return {"message": "Password changed successfully"}

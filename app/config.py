@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     # External APIs
     PAGESPEED_API_KEY: str
     PAGESPEED_API_URL: str = "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
-    PAGESPEED_TIMEOUT: int = 60
+    PAGESPEED_TIMEOUT: int = 120
     
     GHL_API_KEY: str
     GHL_API_BASE_URL: str = "https://rest.gohighlevel.com/v1"

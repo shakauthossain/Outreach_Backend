@@ -25,6 +25,8 @@ class User(Base):
     # User Profile
     full_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     phone: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    company: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    position: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     # Account Status
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)

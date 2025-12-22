@@ -46,12 +46,23 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserUpdate(BaseModel):
+    """Schema for updating user profile"""
+    email: Optional[EmailStr] = Field(None, description="User email address")
+    full_name: Optional[str] = Field(None, max_length=255, description="Full name")
+    phone: Optional[str] = Field(None, max_length=50, description="Phone number")
+    company: Optional[str] = Field(None, max_length=255, description="Company name")
+    position: Optional[str] = Field(None, max_length=255, description="Job position")
+
+
 class UserResponse(UserBase):
     """Schema for user response"""
     id: int
     is_active: bool
     is_verified: bool
     is_superuser: bool
+    company: Optional[str] = None
+    position: Optional[str] = None
     created_at: datetime
     last_login_at: Optional[datetime] = None
     
