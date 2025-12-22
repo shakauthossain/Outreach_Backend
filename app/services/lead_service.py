@@ -135,6 +135,9 @@ class LeadService:
                     Lead.company.ilike(search_term),
                     Lead.website_url.ilike(search_term),
                     Lead.email.ilike(search_term),
+                    Lead.contact_name.ilike(search_term),
+                    Lead.title.ilike(search_term),
+                    Lead.phone.ilike(search_term),
                 )
             )
         
@@ -307,22 +310,68 @@ class LeadService:
         if cached:
             return LeadStatistics(**cached)
         
-        # Query statistics
+        # Query basic statistics
         result = await db.execute(
             select(
                 func.count(Lead.id).label("total"),
                 func.count(Lead.id).filter(Lead.mail_sent == True).label("mail_sent_count"),
+                func.count(Lead.id).filter(
+                    or_(Lead.website_speed_web.isnot(None), Lead.website_speed_mobile.isnot(None))
+                ).label("speed_test_count"),
                 func.avg(Lead.website_speed_web).label("avg_web_speed"),
                 func.avg(Lead.website_speed_mobile).label("avg_mobile_speed"),
             ).where(Lead.deleted_at.is_(None))
         )
         row = result.one()
         
+        # Query performance distribution based on web speed
+        perf_result = await db.execute(
+            select(
+                func.count(Lead.id).filter(Lead.website_speed_web >= 90).label("good"),
+                func.count(Lead.id).filter(
+                    and_(Lead.website_speed_web >= 50, Lead.website_speed_web < 90)
+                ).label("needs_work"),
+                func.count(Lead.id).filter(
+                    and_(Lead.website_speed_web < 50, Lead.website_speed_web > 0)
+                ).label("poor"),
+            ).where(Lead.deleted_at.is_(None))
+        )
+        perf_row = perf_result.one()
+        
+        # Query leads by industry
+        industry_result = await db.execute(
+            select(
+                Lead.industry,
+                func.count(Lead.id).label("count")
+            ).where(
+                and_(Lead.deleted_at.is_(None), Lead.industry.isnot(None))
+            ).group_by(Lead.industry)
+        )
+        leads_by_industry = {row.industry: row.count for row in industry_result.all()}
+        
+        # Query recent additions (last 7 days)
+        from datetime import datetime, timedelta
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        recent_result = await db.execute(
+            select(func.count(Lead.id)).where(
+                and_(Lead.deleted_at.is_(None), Lead.created_at >= seven_days_ago)
+            )
+        )
+        recent_count = recent_result.scalar() or 0
+        
         stats = LeadStatistics(
             total_leads=row.total or 0,
-            mail_sent_count=row.mail_sent_count or 0,
+            leads_with_speed_test=row.speed_test_count or 0,
+            leads_with_mail_sent=row.mail_sent_count or 0,
             average_web_speed=round(row.avg_web_speed or 0, 2),
             average_mobile_speed=round(row.avg_mobile_speed or 0, 2),
+            performance_distribution={
+                "good": perf_row.good or 0,
+                "needs_work": perf_row.needs_work or 0,
+                "poor": perf_row.poor or 0,
+            },
+            leads_by_industry=leads_by_industry,
+            recent_additions=recent_count,
         )
         
         # Cache for 5 minutes
