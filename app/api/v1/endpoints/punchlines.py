@@ -50,7 +50,7 @@ async def generate_punchlines_for_lead(
         )
 
 
-@router.post("/", response_model=Dict[str, Any])
+@router.post("", response_model=Dict[str, Any])
 @limiter.limit("5/minute")
 async def generate_bulk_punchlines(
     request: Request,

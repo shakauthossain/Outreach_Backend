@@ -144,28 +144,54 @@ async def _run_speedtest(task, lead_id: int, strategies: list[str]) -> Dict[str,
                     elif strategy == "desktop":
                         lead.screenshot_url_web = screenshot_data
                 
-                # Store detailed PageSpeed metrics for Performance Diagnostics
-                # Extract audit data for FCP, LCP, TBT, CLS, Speed Index
-                metrics_to_store = {}
-                metric_keys = [
+                # Store full PageSpeed metrics for Performance Diagnostics
+                # Include all audits for detailed analysis (timing, network, recommendations)
+                metrics_to_store = {
+                    "audits": {}
+                }
+                
+                # Key audits to include for comprehensive analysis
+                audit_keys_to_include = [
+                    # Core metrics
                     "first-contentful-paint",
                     "largest-contentful-paint", 
                     "total-blocking-time",
                     "cumulative-layout-shift",
-                    "speed-index"
+                    "speed-index",
+                    "interactive",
+                    # Timing breakdown
+                    "mainthread-work-breakdown",
+                    "bootup-time",
+                    # Network analysis
+                    "network-requests",
+                    "network-rtt",
+                    "network-server-latency",
+                    # Statistics/Diagnostics
+                    "diagnostics",
+                    # Recommendations/Opportunities
+                    "unused-css-rules",
+                    "render-blocking-resources",
+                    "unused-javascript",
+                    "modern-image-formats",
+                    "uses-optimized-images",
+                    "uses-text-compression",
+                    "uses-responsive-images",
+                    "unminified-css",
+                    "unminified-javascript",
+                    "legacy-javascript",
+                    "offscreen-images",
+                    "efficient-animated-content",
+                    "duplicated-javascript",
+                    "total-byte-weight",
+                    "uses-long-cache-ttl",
                 ]
                 
-                for metric_key in metric_keys:
-                    if metric_key in audits:
-                        audit_data = audits[metric_key]
-                        metrics_to_store[metric_key] = {
-                            "displayValue": audit_data.get("displayValue"),
-                            "numericValue": audit_data.get("numericValue"),
-                            "score": audit_data.get("score")
-                        }
+                for audit_key in audit_keys_to_include:
+                    if audit_key in audits:
+                        metrics_to_store["audits"][audit_key] = audits[audit_key]
                 
                 # Store metrics as JSON string
-                if metrics_to_store:
+                if metrics_to_store["audits"]:
                     metrics_json = json.dumps(metrics_to_store)
                     if strategy == "mobile":
                         lead.pagespeed_metrics_mobile = metrics_json

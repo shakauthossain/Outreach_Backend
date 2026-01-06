@@ -13,6 +13,7 @@ from app.schemas.lead import (
     LeadCreate,
     LeadUpdate,
     LeadResponse,
+    LeadListItem,
     LeadListResponse,
     LeadListQuery,
     LeadStatistics,
@@ -30,7 +31,7 @@ router = APIRouter()
 security = HTTPBearer(auto_error=False)
 
 
-@router.get("/", response_model=LeadListResponse)
+@router.get("", response_model=LeadListResponse)
 @limiter.limit(get_rate_limit("leads_read"))
 async def list_leads(
     request: Request,
@@ -43,7 +44,7 @@ async def list_leads(
     min_mobile_speed: float = Query(None, ge=0, le=100),
     max_mobile_speed: float = Query(None, ge=0, le=100),
     sort_by: str = Query("created_at"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -83,7 +84,7 @@ async def list_leads(
     leads, total = await LeadService.list_leads(db, query)
     
     return LeadListResponse(
-        leads=[LeadResponse.model_validate(lead) for lead in leads],
+        leads=[LeadListItem.model_validate(lead) for lead in leads],
         total=total,
         page=page,
         page_size=page_size,
@@ -239,7 +240,7 @@ async def get_lead(
     return LeadResponse.model_validate(lead)
 
 
-@router.post("/", response_model=LeadResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=LeadResponse, status_code=status.HTTP_201_CREATED)
 @limiter.limit(get_rate_limit("leads_create"))
 async def create_lead(
     request: Request,

@@ -14,6 +14,7 @@ from app.schemas.lead import (
     LeadCreate,
     LeadUpdate,
     LeadResponse,
+    LeadListItem,
     LeadListQuery,
     LeadStatistics,
     BulkLeadOperation,

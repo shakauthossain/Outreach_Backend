@@ -24,6 +24,13 @@ def setup_cors(app: FastAPI) -> None:
         # Use ALLOWED_ORIGINS from config
         allowed_origins.extend(settings.ALLOWED_ORIGINS)
     
+    # Production origins - always allowed
+    prod_origins = [
+        "https://outreach.hellonotionhive.com",
+        "http://outreach.hellonotionhive.com",
+    ]
+    allowed_origins.extend(prod_origins)
+    
     # Add development origins if not in production
     if not settings.is_production:
         dev_origins = [

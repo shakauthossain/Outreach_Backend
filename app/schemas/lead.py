@@ -81,7 +81,7 @@ class LeadPerformanceUpdate(BaseModel):
 
 
 class LeadResponse(LeadBase):
-    """Schema for lead response"""
+    """Schema for lead response (full details, used for single lead fetch)"""
     id: int
     
     # Performance metrics
@@ -117,6 +117,47 @@ class LeadResponse(LeadBase):
     # Timestamps
     created_at: datetime
     updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class LeadListItem(LeadBase):
+    """Lightweight schema for lead list responses (excludes large JSON fields)"""
+    id: int
+    
+    # Performance metrics
+    website_speed_web: Optional[float] = None
+    website_speed_mobile: Optional[float] = None
+    accessibility_score: Optional[float] = None
+    seo_score: Optional[float] = None
+    best_practices_score: Optional[float] = None
+    
+    # Screenshots
+    screenshot_url_web: Optional[str] = None
+    screenshot_url_mobile: Optional[str] = None
+    recommendations_screenshot_url: Optional[str] = None
+    
+    # Recommendations - included as it's not as large
+    recommendations: Optional[str] = None
+    
+    # Email
+    subject_line: Optional[str] = None
+    generated_mail: Optional[str] = None
+    mail_sent: bool = False
+    
+    # Punchlines
+    punchlines: Optional[str] = None
+    
+    # GHL
+    conversation_id: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime
+    updated_at: datetime
+    
+    # Note: pagespeed_metrics_mobile and pagespeed_metrics_desktop are excluded
+    # for performance. Use the single lead fetch endpoint to get these.
     
     class Config:
         from_attributes = True
@@ -201,7 +242,7 @@ class CSVColumnMapping(BaseModel):
 
 class LeadListResponse(BaseModel):
     """Response schema for paginated lead list"""
-    leads: list[LeadResponse]
+    leads: list[LeadListItem]
     total: int
     page: int
     page_size: int

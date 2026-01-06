@@ -59,7 +59,7 @@ async def run_speed_test_for_lead(
         )
 
 
-@router.post("/", response_model=SpeedTestResponse)
+@router.post("", response_model=SpeedTestResponse)
 @limiter.limit(get_rate_limit("speedtest_bulk"))
 async def run_bulk_speed_test(
     request: Request,

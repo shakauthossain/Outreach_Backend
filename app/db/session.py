@@ -21,8 +21,8 @@ if settings.DEBUG:
         poolclass=NullPool,
         connect_args={
             "server_settings": {"application_name": settings.APP_NAME},
-            "command_timeout": 60,
-            "timeout": 10,
+            "command_timeout": 120,  # Increased timeout for large queries
+            "timeout": 30,
             "ssl": "require",
             "prepared_statement_cache_size": 0  # Disable prepared statement cache to avoid schema change issues
         },
@@ -43,8 +43,8 @@ else:
         pool_pre_ping=settings.DB_POOL_PRE_PING,
         connect_args={
             "server_settings": {"application_name": settings.APP_NAME},
-            "command_timeout": 60,
-            "timeout": 10,
+            "command_timeout": 120,  # Increased timeout for large queries
+            "timeout": 30,
             "ssl": "require",
             "prepared_statement_cache_size": 0  # Disable prepared statement cache to avoid schema change issues
         },

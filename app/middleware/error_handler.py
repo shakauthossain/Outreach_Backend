@@ -40,11 +40,17 @@ async def error_handler_middleware(request: Request, call_next: Callable) -> Res
     
     except PydanticValidationError as e:
         # Pydantic validation errors
+        # Safely convert errors to avoid serialization issues
+        try:
+            error_details = e.errors()
+        except Exception:
+            error_details = str(e)
+        
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             content={
                 "error": "Validation error",
-                "detail": e.errors(),
+                "detail": error_details,
                 "status_code": 422,
             },
         )

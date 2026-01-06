@@ -5,6 +5,7 @@ from datetime import datetime
 
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.models.lead import Lead
 from app.schemas.lead import (
@@ -124,8 +125,11 @@ class LeadService:
         Returns:
             Tuple of (leads list, total count)
         """
-        # Build base query
-        stmt = select(Lead).where(Lead.deleted_at.is_(None))
+        # Build base query - defer loading of large JSON fields for performance
+        stmt = select(Lead).where(Lead.deleted_at.is_(None)).options(
+            defer(Lead.pagespeed_metrics_mobile),
+            defer(Lead.pagespeed_metrics_desktop),
+        )
         
         # Apply search filter
         if query.search:

@@ -71,10 +71,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="NH Outreach Agent API",
     description="Backend API for web performance analysis and outreach automation",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
     docs_url="/docs" if not settings.is_production else None,
     redoc_url="/redoc" if not settings.is_production else None,
+    redirect_slashes=False,  # Disable trailing slash redirects to prevent CORS issues
 )
 
 # Add rate limiter state
